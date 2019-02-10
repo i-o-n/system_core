@@ -105,13 +105,17 @@ class MountEntry {
         int st;
         if (IsF2Fs()) {
             const char* f2fs_argv[] = {
-                "/system/bin/fsck.f2fs", "-f", mnt_fsname_.c_str(),
+                    "/system/bin/fsck.f2fs",
+                    "-a",
+                    mnt_fsname_.c_str(),
             };
             android_fork_execvp_ext(arraysize(f2fs_argv), (char**)f2fs_argv, &st, true, LOG_KLOG,
                                     true, nullptr, nullptr, 0);
         } else if (IsExt4()) {
             const char* ext4_argv[] = {
-                "/system/bin/e2fsck", "-f", "-y", mnt_fsname_.c_str(),
+                    "/system/bin/e2fsck",
+                    "-y",
+                    mnt_fsname_.c_str(),
             };
             android_fork_execvp_ext(arraysize(ext4_argv), (char**)ext4_argv, &st, true, LOG_KLOG,
                                     true, nullptr, nullptr, 0);
@@ -350,15 +354,14 @@ void DoReboot(unsigned int cmd, const std::string& reason, const std::string& re
 
     auto shutdown_timeout = 0ms;
     if (!SHUTDOWN_ZERO_TIMEOUT) {
-        if (is_thermal_shutdown) {
-            constexpr unsigned int thermal_shutdown_timeout = 1;
-            shutdown_timeout = std::chrono::seconds(thermal_shutdown_timeout);
-        } else {
-            constexpr unsigned int shutdown_timeout_default = 6;
-            auto shutdown_timeout_property = android::base::GetUintProperty(
-                "ro.build.shutdown_timeout", shutdown_timeout_default);
-            shutdown_timeout = std::chrono::seconds(shutdown_timeout_property);
+        constexpr unsigned int shutdown_timeout_default = 6;
+        constexpr unsigned int max_thermal_shutdown_timeout = 3;
+        auto shutdown_timeout_final =
+            android::base::GetUintProperty("ro.build.shutdown_timeout", shutdown_timeout_default);
+        if (is_thermal_shutdown && shutdown_timeout_final > max_thermal_shutdown_timeout) {
+            shutdown_timeout_final = max_thermal_shutdown_timeout;
         }
+        shutdown_timeout = std::chrono::seconds(shutdown_timeout_final);
     }
     LOG(INFO) << "Shutdown timeout: " << shutdown_timeout.count() << " ms";
 
